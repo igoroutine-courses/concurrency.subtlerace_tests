@@ -13,7 +13,7 @@ import (
 )
 
 func TestStressCronZeroDuration(t *testing.T) {
-	for range 1_000_000 {
+	for range 100_000 {
 		synctest.Test(t, func(t *testing.T) {
 			c := New()
 

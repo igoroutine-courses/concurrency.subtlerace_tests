@@ -8,6 +8,7 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 )
@@ -175,4 +176,9 @@ func TestContextAlreadyCancelled(t *testing.T) {
 			t.Fatalf("Run did not exit after cancel")
 		}
 	})
+}
+
+func TestNoInternalState(t *testing.T) {
+	const size = unsafe.Sizeof(*New())
+	require.Zero(t, size)
 }
