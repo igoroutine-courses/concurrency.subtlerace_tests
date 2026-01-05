@@ -69,7 +69,8 @@ t.Reset(next())
 * Не стоит изменять файлы в директории [.github](.github)
 
 ## Особенности реализации
-* Желательно не использовать `time.Sleep` в реализации
+* Реализации с `time.Sleep` и `time.AfterFunc` не проходят [hard_test](./internal/cron/hard_test.go) из-за избыточного
+количества горутин. Лучше посмотреть в сторону time.NewTimer.
 
 ## Скрипты
 Для запуска скриптов на курсе необходимо установить [go-task](https://taskfile.dev/docs/installation)

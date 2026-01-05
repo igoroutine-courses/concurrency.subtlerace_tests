@@ -5,6 +5,7 @@ package cron
 import (
 	"context"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -57,24 +58,62 @@ func TestStressCronZeroDuration(t *testing.T) {
 }
 
 func TestNumGoroutines(t *testing.T) {
-	c := New()
+	for range 1000 {
+		c := New()
 
-	gNum := inspectNumGoroutines(t, func() {
-		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*2)
-		defer cancel()
+		block := make(chan struct{})
+		unblock := make(chan struct{})
+		once := sync.Once{}
+		wg := sync.WaitGroup{}
 
-		c.Run(ctx,
-			func() {},
-			func() time.Duration {
-				return time.Millisecond
+		gNum := inspectNumGoroutines(t, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+
+			action := func() {
+				once.Do(func() {
+					close(block)
+				})
+
+				<-unblock
+			}
+			next := func() time.Duration {
+				return 1 * time.Millisecond
+			}
+
+			wg.Go(func() {
+				c.Run(ctx, action, next)
+
 			})
-	})
 
-	require.Zero(t, gNum)
+			<-block
+			close(unblock)
+			<-ctx.Done()
+		})
+
+		wg.Wait()
+		require.LessOrEqual(t, gNum, 2)
+
+		runtime.GC()
+
+		// hint: time.AfterFunc создаёт дополнительную горутину, чтобы случайно не заблокировать структуры рантайма
+		// при выполнении таймера:
+
+		// func goFunc(arg any, seq uintptr, delta int64) {
+		//	go arg.(func())()
+		//}
+
+		// Используйте time.NewTimer(d)
+	}
 }
 
 func inspectNumGoroutines(t *testing.T, f func()) int {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
 	t.Helper()
+
+	start := runtime.NumGoroutine()
 
 	wg := new(sync.WaitGroup)
 
@@ -94,5 +133,5 @@ func inspectNumGoroutines(t *testing.T, f func()) int {
 	})
 
 	wg.Wait()
-	return max(0, int(result.Load())-2-3)
+	return int(result.Load()) - start - 2
 }
