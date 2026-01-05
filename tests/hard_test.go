@@ -4,6 +4,8 @@ package cron
 
 import (
 	"context"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -52,4 +54,45 @@ func TestStressCronZeroDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNumGoroutines(t *testing.T) {
+	c := New()
+
+	gNum := inspectNumGoroutines(t, func() {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*2)
+		defer cancel()
+
+		c.Run(ctx,
+			func() {},
+			func() time.Duration {
+				return time.Millisecond
+			})
+	})
+
+	require.Zero(t, gNum)
+}
+
+func inspectNumGoroutines(t *testing.T, f func()) int {
+	t.Helper()
+
+	wg := new(sync.WaitGroup)
+
+	result := atomic.Int64{}
+	result.Store(int64(runtime.NumGoroutine()))
+
+	done := atomic.Bool{}
+	wg.Go(func() {
+		f()
+		done.Store(true)
+	})
+
+	wg.Go(func() {
+		for !done.Load() {
+			result.Store(max(result.Load(), int64(runtime.NumGoroutine())))
+		}
+	})
+
+	wg.Wait()
+	return max(0, int(result.Load())-2-3)
 }
