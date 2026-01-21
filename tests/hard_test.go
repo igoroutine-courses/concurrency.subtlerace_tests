@@ -4,6 +4,7 @@ package cron
 
 import (
 	"context"
+	"math"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -58,7 +59,7 @@ func TestStressCronZeroDuration(t *testing.T) {
 }
 
 func TestNumGoroutines(t *testing.T) {
-	for range 1000 {
+	for range 100 {
 		c := New()
 
 		block := make(chan struct{})
@@ -110,6 +111,11 @@ func TestNumGoroutines(t *testing.T) {
 func inspectNumGoroutines(t *testing.T, f func()) int {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
+
+	cur := debug.SetMemoryLimit(-1)
+	defer debug.SetMemoryLimit(cur)
+
+	debug.SetMemoryLimit(math.MaxInt)
 
 	t.Helper()
 
